@@ -1,6 +1,23 @@
 ## WoLive 文档
 
-#### wolvie-web安装
+### 安装
+
+- wolive分为两个部分，wolive-pusher服务部分和web部分。wolive-pusher服务用来做websocket实时通讯，web部分用做api接口和页面展现。
+
+#### wolive-pusher服务部分安装
+1. 安装websocket服务所需workerman环境，参考http://www.workerman.net。
+
+2. 打开wolive-pusher/config.php(win系统的话是wolive-pusher-win/config.php)，将$domain设置成实际客服系统要用的域名。
+   安装后，检查9090和2080端口是否在防火墙中打开！
+
+![输入图片说明](https://gitee.com/uploads/images/2017/1129/153722_07922fea_1288445.png "TIM截图20171129153704.png")
+
+3. 进入到wolvie-pusher(-for-win)目录，命令行运行 php start.php start -d 启动websocket服务，界面类似如下。
+
+![输入图片说明](https://gitee.com/uploads/images/2017/1129/153834_6644a656_1288445.png "TIM截图20171129153820.png")
+
+
+#### wolvie-web部分安装
 
 1. wolive-web 可以用nginx+php-fpm或者apache来运行(二者选其一即可)，配置参考如下。
 nginx配置
@@ -79,7 +96,7 @@ RewriteRule (.*)$ /index\.php\?s=$1 [I]
 
 ![输入图片说明](https://gitee.com/uploads/images/2017/1129/155009_5a424bb5_1288445.png "TIM截图20171129154404.png")
 
-第二步、配置数据库相关信息，其中服务器端口配置用您的授权信息填写
+第二步、配置数据库相关信息，其中服务器端口配置用默认值即可
 
 ![输入图片说明](https://gitee.com/uploads/images/2017/1129/155058_b208c104_1288445.png "TIM截图20171129154514.png")
 
@@ -92,8 +109,6 @@ RewriteRule (.*)$ /index\.php\?s=$1 [I]
 
 1. wolive_service表
  - 客服列表 
-
-
 ```
  CREATE TABLE `wolive_service` (
   `service_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -117,7 +132,6 @@ RewriteRule (.*)$ /index\.php\?s=$1 [I]
 
 2.wolive_visiter表
 
-
 ```
 CREATE TABLE `wolive_visiter` (
   `vid` int(11) NOT NULL AUTO_INCREMENT,
@@ -139,7 +153,6 @@ CREATE TABLE `wolive_visiter` (
 
 3.wolive_business表
 
-
 ```
 CREATE TABLE `wolive_business` (
   `wid` int(11) NOT NULL AUTO_INCREMENT,
@@ -154,9 +167,7 @@ CREATE TABLE `wolive_business` (
   UNIQUE KEY `bussiness` (`business_id`) USING BTREE
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
 ```
-
 4.wolive_chats表
-
 
 ```
 CREATE TABLE `wolive_chats` (
@@ -175,7 +186,6 @@ CREATE TABLE `wolive_chats` (
   KEY `chat` (`business_id`) USING BTREE
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
 ```
-
 5.wolive_message表
 
 
@@ -197,7 +207,6 @@ CREATE TABLE `wolive_message` (
 
 6.wolive_question表
 
-
 ```
 CREATE TABLE `wolive_question` (
   `qid` int(11) NOT NULL AUTO_INCREMENT,
@@ -211,7 +220,6 @@ CREATE TABLE `wolive_question` (
 ```
 
 7.wolive_queue表
-
 
 ```
 CREATE TABLE `wolive_queue` (
@@ -232,7 +240,6 @@ CREATE TABLE `wolive_queue` (
 
 8.wolive_sentence表
 
-
 ```
 CREATE TABLE `wolive_sentence` (
   `sid` int(11) NOT NULL AUTO_INCREMENT,
@@ -244,7 +251,6 @@ CREATE TABLE `wolive_sentence` (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 ```
 9.wolive_tablist表
-
 
 ```
 CREATE TABLE `wolive_tablist` (
@@ -271,6 +277,99 @@ CREATE TABLE `wolive_weixin` (
 
 ```
 
+### Pusher 的基本运用
+
+#### 服务端
+
+```php
+
+<?php
+// 引入pusher ,在 app\extra\push\Pusher.php
+use app\extra\push\Pusher;
+// 如果 $ahost 是http的
+$options = array(
+    'encrypted' => false
+ );
+
+// 如果 $ahost 是https的
+$options = array(
+    'encrypted' => true
+ );
+
+// 初始化服务端
+ $pusher = new Pusher(
+            $app_key,
+            $app_secret,
+            $app_id,
+            $options,
+            $ahost,
+            $aport
+        );
+
+
+// 向my-chanel的seedmsg事件推送消息
+ $pusher->trigger('my-channel', 'seedmsg', array('message' =>"hello"));
+
+```
+
+
+#### 客户端
+
+```javascript
+<script src="https://你的域名/assets/libs/push/pusher.min.js"></script>
+<script>
+  // app_key 就是安装步骤中的app_key
+  var pusher = new Pusher(app_key, {
+                encrypted: false
+                , enabledTransports: ['ws']
+                , wsHost: '你的域名'
+                , wsPort: 9090
+        });
+
+// 如果websocket 地址是 wss 加密协议的，则如下
+   var pusher = new Pusher(app_key, {
+                encrypted: true
+                , enabledTransports: ['wss']
+                , wsHost: '你的域名'
+                , wssPort: 9090
+        });
+
+// 订阅频道 my-channel
+var channel = pusher.subscribe('my-channel');
+
+// 监听该频道中 sendmsg 事件
+channel.bind('sendmsg', function(data) {
+        // 这里会接受到 data：{message:'hello'}
+        alert(data.message);
+    });
+
+</script>
+
+```
+
+在wolive中 客服后台监听了3个频道
+- 第一是 'kefu'+ 客服的id，监听以下事件：
+  1. cu-event  接受访客的发送的消息
+  2. logout    监听访客的离线状态，并把头像至灰
+  3. geton     监听访客的在线状态，并把头像高亮
+  4. video     监听视频申请请求
+  5  video-refuse  监听对方拒绝视频的请求
+
+- 第二是 'ud' + 客服的id，监听以下事件：
+  1. on_notice 监听并获取被分配过来客服的信息
+
+- 第三是 'all'+ 该客服所负责的wed
+  1.on_notice 监听并告知所有该web下的客服，有访客在等待交谈
+
+在wolive中 访客监听2个频道
+- 第一个 "cu" + 访客的channel，监听以下事件：
+  1. my-event  接受客服的发送的消息
+  2. video     监听视频申请请求
+  3. video-refuse  监听对方拒绝视频的请求
+  4. cu_notice  监听访客被认领并且获取客服数据
+- 第二个 "se" + 客服的id，监听以下事件：
+  1. logout    监听客服的离线状态，并把头像至灰
+  2. geton     监听客服的在线状态，并把头像高亮
 
 ### WoLive 公用API
 
